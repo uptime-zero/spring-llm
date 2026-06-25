@@ -70,10 +70,40 @@
       overflow: hidden;
       text-overflow: ellipsis;
       transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .conv-item:hover { background: rgba(255,255,255,0.08); }
     .conv-item.active { background: rgba(255,255,255,0.15); color: #fff; }
+
+    .conv-item-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .conv-delete-btn {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.4);
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      border-radius: 4px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .conv-item:hover .conv-delete-btn { display: flex; }
+    .conv-delete-btn:hover { color: #ff6b6b; background: rgba(255,255,255,0.1); }
 
     /* ── 메인 채팅 영역 ── */
     .main {
@@ -259,10 +289,39 @@
     Object.entries(store).reverse().forEach(([id, conv]) => {
       const item = document.createElement('div');
       item.className = 'conv-item' + (id === currentId ? ' active' : '');
-      item.textContent = conv.title || '새 채팅';
-      item.onclick = () => switchConv(id);
+
+      const title = document.createElement('span');
+      title.className = 'conv-item-title';
+      title.textContent = conv.title || '새 채팅';
+      title.onclick = () => switchConv(id);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'conv-delete-btn';
+      delBtn.textContent = '×';
+      delBtn.title = '대화 삭제';
+      delBtn.onclick = (e) => { e.stopPropagation(); deleteConv(id); };
+
+      item.appendChild(title);
+      item.appendChild(delBtn);
       listEl.appendChild(item);
     });
+  }
+
+  function deleteConv(id) {
+    const store = loadStore();
+    delete store[id];
+    saveStore(store);
+
+    const ids = Object.keys(store);
+    if (id === currentId) {
+      if (ids.length > 0) {
+        switchConv(ids[ids.length - 1]);
+      } else {
+        newChat();
+      }
+    } else {
+      renderConvList();
+    }
   }
 
   // ── 채팅 메시지 렌더링 ───────────────────────────────
@@ -355,7 +414,7 @@
 
     es.onmessage = (e) => {
       if (first) { bubble.classList.remove('thinking'); first = false; }
-      response += e.data;
+      response += JSON.parse(e.data);
       bubble.textContent = response;
       document.getElementById('chat').scrollTop = 99999;
     };

@@ -49,7 +49,16 @@ public class ChatController {
             spec = spec.options(OllamaChatOptions.builder().model(model));
         }
 
-        return spec.stream().content();
+        return spec.stream().content()
+                .map(ChatController::toJsonString);
+    }
+
+    private static String toJsonString(String s) {
+        return "\"" + s.replace("\\", "\\\\")
+                       .replace("\"", "\\\"")
+                       .replace("\n", "\\n")
+                       .replace("\r", "\\r")
+                       .replace("\t", "\\t") + "\"";
     }
 }
 
