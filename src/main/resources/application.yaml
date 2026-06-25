@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: ollama-chatbot
+
+  ai:
+    ollama:
+      base-url: http://localhost:11434   # 로컬 Ollama
+      chat:
+        model: llama3.1                  # ollama pull llama3.1
+        think: false                     # ⚠️ 1.x think-option → 2.0 think
+        temperature: 0.7
+        num-predict: 2048
+      embedding:
+        model: nomic-embed-text          # RAG용 (Phase 3~)
+
+  # 로컬 개발: H2 인메모리
+  datasource:
+    url: jdbc:h2:mem:chatdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true                      # localhost:8080/h2-console 접속 가능
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    open-in-view: false
+
+server:
+  port: 8080
+
+# Actuator — 로컬 전체 노출
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+
+logging:
+  level:
+    org.springframework.ai: DEBUG        # AI 요청/응답 로그 확인
+    com.example.chatbot: DEBUG

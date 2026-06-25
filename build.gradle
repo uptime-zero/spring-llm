@@ -1,0 +1,58 @@
+plugins {
+    id 'org.springframework.boot' version '4.1.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'java'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        // Java 25 LTS — Spring Boot 4.1 공식 지원 버전
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencyManagement {
+    imports {
+        // Spring AI BOM — spring-ai 모든 모듈 버전 일괄 관리
+        mavenBom "org.springframework.ai:spring-ai-bom:2.0.0"
+    }
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'   // SSE 스트리밍
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'  // 대화 히스토리
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'  // 헬스체크
+
+    // Spring AI 2.0 — artifact ID 1.x와 다름 (아래 주의사항 참고)
+    implementation 'org.springframework.ai:spring-ai-starter-model-ollama'
+    // RAG 사용 시 (Phase 3~):
+    // implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
+
+    // 로컬 개발용 인메모리 DB
+    runtimeOnly 'com.h2database:h2'
+    // PGVector 전환 시:
+    // runtimeOnly 'org.postgresql:postgresql'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+// Java 25 미리보기 기능 활성화 (선택)
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += ['--enable-preview']
+}
+tasks.withType(Test).configureEach {
+    jvmArgs '--enable-preview'
+}
+tasks.named('bootRun') {
+    jvmArgs '--enable-preview'
+}
