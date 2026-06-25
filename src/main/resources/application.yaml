@@ -6,7 +6,7 @@ spring:
     ollama:
       base-url: http://localhost:11434   # 로컬 Ollama
       chat:
-        model: llama3.1                  # ollama pull llama3.1
+        model: llama3.1b                  # ollama pull llama3.1b
         think: false                     # ⚠️ 1.x think-option → 2.0 think
         temperature: 0.7
         num-predict: 2048
@@ -43,4 +43,4 @@ management:
 logging:
   level:
     org.springframework.ai: DEBUG        # AI 요청/응답 로그 확인
-    com.example.chatbot: DEBUG
+    com.springllm: DEBUG
