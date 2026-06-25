@@ -12,25 +12,80 @@
       background: #f5f5f5;
       height: 100vh;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
     }
 
-    .container {
+    .app {
       width: 100%;
-      max-width: 800px;
+      max-width: 1000px;
       height: 90vh;
-      background: #fff;
+      display: flex;
       border-radius: 12px;
       box-shadow: 0 2px 16px rgba(0,0,0,0.1);
-      display: flex;
-      flex-direction: column;
       overflow: hidden;
     }
 
+    /* ── 사이드바 ── */
+    .sidebar {
+      width: 220px;
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+    }
+
+    .new-chat-btn {
+      width: 100%;
+      padding: 10px;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s;
+    }
+
+    .new-chat-btn:hover { background: rgba(255,255,255,0.08); }
+
+    .conv-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 8px 8px;
+    }
+
+    .conv-item {
+      padding: 9px 10px;
+      border-radius: 6px;
+      color: rgba(255,255,255,0.75);
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: background 0.15s;
+    }
+
+    .conv-item:hover { background: rgba(255,255,255,0.08); }
+    .conv-item.active { background: rgba(255,255,255,0.15); color: #fff; }
+
+    /* ── 메인 채팅 영역 ── */
+    .main {
+      flex: 1;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
     .header {
-      padding: 16px 20px;
+      padding: 14px 20px;
       border-bottom: 1px solid #e5e5e5;
       display: flex;
       align-items: center;
@@ -38,27 +93,22 @@
     }
 
     .header h1 {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 600;
       color: #1a1a1a;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .model-select {
-      margin-left: auto;
       display: flex;
       align-items: center;
       gap: 8px;
       font-size: 13px;
       color: #666;
-    }
-
-    .model-select select {
-      padding: 4px 8px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      font-size: 13px;
-      background: #fafafa;
-      cursor: pointer;
+      flex-shrink: 0;
     }
 
     .model-input {
@@ -66,7 +116,7 @@
       border: 1px solid #ddd;
       border-radius: 6px;
       font-size: 13px;
-      width: 160px;
+      width: 150px;
     }
 
     #chat {
@@ -84,15 +134,8 @@
       max-width: 75%;
     }
 
-    .message.user {
-      align-self: flex-end;
-      align-items: flex-end;
-    }
-
-    .message.bot {
-      align-self: flex-start;
-      align-items: flex-start;
-    }
+    .message.user { align-self: flex-end; align-items: flex-end; }
+    .message.bot  { align-self: flex-start; align-items: flex-start; }
 
     .bubble {
       padding: 10px 14px;
@@ -122,7 +165,7 @@
 
     @keyframes blink {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0; }
+      50%       { opacity: 0; }
     }
 
     .input-area {
@@ -158,49 +201,79 @@
       white-space: nowrap;
     }
 
-    #send-btn:hover { background: #1558b0; }
+    #send-btn:hover    { background: #1558b0; }
     #send-btn:disabled { background: #aaa; cursor: not-allowed; }
   </style>
 </head>
 <body>
-<div class="container">
-  <div class="header">
-    <h1>로컬 AI 챗봇</h1>
-    <div class="model-select">
-      <label for="model-input">모델</label>
-      <input id="model-input" class="model-input" type="text" placeholder="기본값 (gemma3:1b)" />
+<div class="app">
+
+  <!-- 사이드바 -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <button class="new-chat-btn" onclick="newChat()">+ 새 채팅</button>
+    </div>
+    <div class="conv-list" id="conv-list"></div>
+  </div>
+
+  <!-- 채팅 영역 -->
+  <div class="main">
+    <div class="header">
+      <h1 id="conv-title">새 채팅</h1>
+      <div class="model-select">
+        <label for="model-input">모델</label>
+        <input id="model-input" class="model-input" type="text" placeholder="기본값 (gemma3:1b)" />
+      </div>
+    </div>
+
+    <div id="chat"></div>
+
+    <div class="input-area">
+      <textarea id="msg" rows="1" placeholder="메시지를 입력하세요... (Shift+Enter: 줄바꿈)"></textarea>
+      <button id="send-btn" onclick="send()">전송</button>
     </div>
   </div>
 
-  <div id="chat"></div>
-
-  <div class="input-area">
-    <textarea id="msg" rows="1" placeholder="메시지를 입력하세요... (Shift+Enter: 줄바꿈)"></textarea>
-    <button id="send-btn" onclick="send()">전송</button>
-  </div>
 </div>
 
 <script>
-  const sessionId = crypto.randomUUID();
+  // ── 상태 ──────────────────────────────────────────────
+  const STORAGE_KEY = 'chatbot_conversations';
+  let currentId = null;
 
-  const chatEl = document.getElementById('chat');
-  const msgEl = document.getElementById('msg');
-  const sendBtn = document.getElementById('send-btn');
-  const modelInput = document.getElementById('model-input');
+  // 저장 구조: { [id]: { title: string, messages: [{role, text}] } }
+  function loadStore() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  }
 
-  msgEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      send();
-    }
-  });
+  function saveStore(store) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  }
 
-  msgEl.addEventListener('input', () => {
-    msgEl.style.height = 'auto';
-    msgEl.style.height = Math.min(msgEl.scrollHeight, 120) + 'px';
-  });
+  // ── 대화 목록 렌더링 ──────────────────────────────────
+  function renderConvList() {
+    const store = loadStore();
+    const listEl = document.getElementById('conv-list');
+    listEl.innerHTML = '';
 
-  function appendMessage(role, text) {
+    Object.entries(store).reverse().forEach(([id, conv]) => {
+      const item = document.createElement('div');
+      item.className = 'conv-item' + (id === currentId ? ' active' : '');
+      item.textContent = conv.title || '새 채팅';
+      item.onclick = () => switchConv(id);
+      listEl.appendChild(item);
+    });
+  }
+
+  // ── 채팅 메시지 렌더링 ───────────────────────────────
+  function renderMessages(messages) {
+    const chatEl = document.getElementById('chat');
+    chatEl.innerHTML = '';
+    messages.forEach(({ role, text }) => appendBubble(role, text));
+  }
+
+  function appendBubble(role, text) {
+    const chatEl = document.getElementById('chat');
     const wrapper = document.createElement('div');
     wrapper.className = `message ${role}`;
     const bubble = document.createElement('div');
@@ -212,6 +285,52 @@
     return bubble;
   }
 
+  // ── 새 채팅 ───────────────────────────────────────────
+  function newChat() {
+    const id = crypto.randomUUID();
+    const store = loadStore();
+    store[id] = { title: '새 채팅', messages: [] };
+    saveStore(store);
+    switchConv(id);
+  }
+
+  // ── 대화 전환 ─────────────────────────────────────────
+  function switchConv(id) {
+    currentId = id;
+    const store = loadStore();
+    const conv = store[id];
+    document.getElementById('conv-title').textContent = conv.title;
+    renderMessages(conv.messages);
+    renderConvList();
+  }
+
+  // ── 메시지 저장 ───────────────────────────────────────
+  function saveMessage(role, text) {
+    const store = loadStore();
+    const conv = store[currentId];
+    conv.messages.push({ role, text });
+    if (role === 'user' && conv.title === '새 채팅') {
+      conv.title = text.slice(0, 28) + (text.length > 28 ? '…' : '');
+      document.getElementById('conv-title').textContent = conv.title;
+    }
+    saveStore(store);
+    renderConvList();
+  }
+
+  // ── 전송 ─────────────────────────────────────────────
+  const msgEl   = document.getElementById('msg');
+  const sendBtn = document.getElementById('send-btn');
+  const modelInput = document.getElementById('model-input');
+
+  msgEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+
+  msgEl.addEventListener('input', () => {
+    msgEl.style.height = 'auto';
+    msgEl.style.height = Math.min(msgEl.scrollHeight, 120) + 'px';
+  });
+
   async function send() {
     const text = msgEl.value.trim();
     if (!text || sendBtn.disabled) return;
@@ -220,25 +339,25 @@
     msgEl.style.height = 'auto';
     sendBtn.disabled = true;
 
-    appendMessage('user', text);
+    saveMessage('user', text);
+    appendBubble('user', text);
 
-    const bubble = appendMessage('bot', '');
+    const bubble = appendBubble('bot', '');
     bubble.classList.add('thinking');
 
     const model = modelInput.value.trim();
-    const params = new URLSearchParams({ message: text, conversationId: sessionId });
+    const params = new URLSearchParams({ message: text, conversationId: currentId });
     if (model) params.append('model', model);
 
     const es = new EventSource(`/api/chat/stream?${params}`);
+    let response = '';
     let first = true;
 
     es.onmessage = (e) => {
-      if (first) {
-        bubble.classList.remove('thinking');
-        first = false;
-      }
-      bubble.textContent += e.data;
-      chatEl.scrollTop = chatEl.scrollHeight;
+      if (first) { bubble.classList.remove('thinking'); first = false; }
+      response += e.data;
+      bubble.textContent = response;
+      document.getElementById('chat').scrollTop = 99999;
     };
 
     es.onerror = () => {
@@ -247,14 +366,27 @@
         bubble.classList.remove('thinking');
         bubble.textContent = '응답을 받지 못했습니다.';
       }
+      if (response) saveMessage('bot', response);
       sendBtn.disabled = false;
     };
 
     es.addEventListener('complete', () => {
       es.close();
+      if (response) saveMessage('bot', response);
       sendBtn.disabled = false;
     });
   }
+
+  // ── 초기화 ────────────────────────────────────────────
+  (function init() {
+    const store = loadStore();
+    const ids = Object.keys(store);
+    if (ids.length > 0) {
+      switchConv(ids[ids.length - 1]);
+    } else {
+      newChat();
+    }
+  })();
 </script>
 </body>
 </html>
