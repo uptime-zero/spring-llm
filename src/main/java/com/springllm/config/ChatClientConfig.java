@@ -20,8 +20,7 @@ public class ChatClientConfig {
     @Bean
     public ChatClient chatClient(OllamaChatModel chatModel) {
         ChatbotProperties.ClientProperties client = chatbotProperties.client();
-        return ChatClient.builder(chatModel)
-                .defaultSystem(client.systemPrompt())
+        ChatClient.Builder builder = ChatClient.builder(chatModel)
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
                 .defaultOptions(
                         OllamaChatOptions.builder()
@@ -29,7 +28,10 @@ public class ChatClientConfig {
                                 .model(client.model())
                                 .numPredict(client.numPredict())
                                 .thinkOption(new ThinkOption.ThinkBoolean(client.think()))
-                )
-                .build();
+                );
+        if (client.systemPrompt() != null && !client.systemPrompt().isBlank()) {
+            builder = builder.defaultSystem(client.systemPrompt());
+        }
+        return builder.build();
     }
 }
