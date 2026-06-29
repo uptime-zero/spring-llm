@@ -68,7 +68,6 @@
       cursor: pointer;
       white-space: nowrap;
       overflow: hidden;
-      text-overflow: ellipsis;
       transition: background 0.15s;
       display: flex;
       align-items: center;
@@ -92,7 +91,6 @@
       border: none;
       color: rgba(255,255,255,0.4);
       font-size: 14px;
-      line-height: 1;
       cursor: pointer;
       border-radius: 4px;
       display: none;
@@ -113,7 +111,6 @@
       border: none;
       color: rgba(255,255,255,0.4);
       font-size: 11px;
-      line-height: 1;
       cursor: pointer;
       border-radius: 4px;
       display: none;
@@ -259,7 +256,6 @@
       font-weight: 500;
       cursor: pointer;
       transition: background 0.2s;
-      white-space: nowrap;
     }
 
     #send-btn:hover    { background: #1558b0; }
@@ -301,7 +297,7 @@
   // ── 상태 ──────────────────────────────────────────────
   const STORAGE_KEY = 'chatbot_conversations';
   let currentId = null;
-  const activeStreams = new Map(); // conversationId → EventSource
+  const activeStreams = new Map(); // conversationId → AbortController
 
   // 저장 구조: { [id]: { title: string, messages: [{role, text}], model: string } }
   function loadStore() {
@@ -315,8 +311,7 @@
   // ── 대화 목록 렌더링 ──────────────────────────────────
   function renderConvList() {
     const store = loadStore();
-    const listEl = document.getElementById('conv-list');
-    listEl.innerHTML = '';
+    convListEl.innerHTML = '';
 
     Object.entries(store).reverse().forEach(([id, conv]) => {
       const item = document.createElement('div');
@@ -343,7 +338,7 @@
       item.appendChild(title);
       item.appendChild(renameBtn);
       item.appendChild(delBtn);
-      listEl.appendChild(item);
+      convListEl.appendChild(item);
     });
   }
 
@@ -379,7 +374,7 @@
     store[id].title = newTitle;
     saveStore(store);
     if (id === currentId) {
-      document.getElementById('conv-title').textContent = newTitle;
+      convTitleEl.textContent = newTitle;
     }
     renderConvList();
   }
@@ -407,13 +402,11 @@
 
   // ── 채팅 메시지 렌더링 ───────────────────────────────
   function renderMessages(messages) {
-    const chatEl = document.getElementById('chat');
     chatEl.innerHTML = '';
     messages.forEach(({ role, text }) => appendBubble(role, text));
   }
 
   function appendBubble(role, text) {
-    const chatEl = document.getElementById('chat');
     const wrapper = document.createElement('div');
     wrapper.className = `message ${role}`;
     const bubble = document.createElement('div');
@@ -439,7 +432,7 @@
     currentId = id;
     const store = loadStore();
     const conv = store[id];
-    document.getElementById('conv-title').textContent = conv.title;
+    convTitleEl.textContent = conv.title;
     modelInput.value = conv.model || '';
     renderMessages(conv.messages);
     renderConvList();
@@ -454,17 +447,20 @@
     if (role === 'user' && conv.title === '새 채팅') {
       conv.title = text.slice(0, 28) + (text.length > 28 ? '…' : '');
       if (id === currentId) {
-        document.getElementById('conv-title').textContent = conv.title;
+        convTitleEl.textContent = conv.title;
       }
     }
     saveStore(store);
     renderConvList();
   }
 
-  // ── 전송 ─────────────────────────────────────────────
-  const msgEl   = document.getElementById('msg');
-  const sendBtn = document.getElementById('send-btn');
-  const modelInput = document.getElementById('model-input');
+  // ── DOM 선택자 캐시 ──────────────────────────────────
+  const msgEl       = document.getElementById('msg');
+  const sendBtn     = document.getElementById('send-btn');
+  const modelInput  = document.getElementById('model-input');
+  const chatEl      = document.getElementById('chat');
+  const convListEl  = document.getElementById('conv-list');
+  const convTitleEl = document.getElementById('conv-title');
 
   msgEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
@@ -500,42 +496,57 @@
     bubble.classList.add('thinking');
 
     const model = modelInput.value.trim();
-    const params = new URLSearchParams({ message: text, conversationId: sendId });
-    if (model) params.append('model', model);
-
-    const es = new EventSource(`/api/chat/stream?${params}`);
-    activeStreams.set(sendId, es);
+    const abortCtrl = new AbortController();
+    activeStreams.set(sendId, abortCtrl);
     updateSendBtn();
 
     let response = '';
     let first = true;
 
-    es.onmessage = (e) => {
-      if (first) { bubble.classList.remove('thinking'); first = false; }
-      response += JSON.parse(e.data);
-      bubble.textContent = response;
-      if (sendId === currentId) {
-        document.getElementById('chat').scrollTop = 99999;
-      }
-    };
+    try {
+      const res = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, conversationId: sendId, model: model || null }),
+        signal: abortCtrl.signal
+      });
 
-    es.onerror = () => {
-      es.close();
-      if (first) {
-        bubble.classList.remove('thinking');
-        bubble.textContent = '응답을 받지 못했습니다.';
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // 아직 완성되지 않은 줄은 다음 청크로
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if (!data) continue;
+          if (first) { bubble.classList.remove('thinking'); first = false; }
+          response += JSON.parse(data);
+          bubble.textContent = response;
+          if (sendId === currentId) {
+            chatEl.scrollTop = chatEl.scrollHeight;
+          }
+        }
       }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        if (first) {
+          bubble.classList.remove('thinking');
+          bubble.textContent = '응답을 받지 못했습니다.';
+        }
+      }
+    } finally {
       if (response) saveMessage('bot', response, sendId);
       activeStreams.delete(sendId);
-      updateSendBtn();
-    };
-
-    es.addEventListener('complete', () => {
-      es.close();
-      if (response) saveMessage('bot', response, sendId);
-      activeStreams.delete(sendId);
-      updateSendBtn();
-    });
+      if (sendId === currentId) updateSendBtn();
+    }
   }
 
   // ── 초기화 ────────────────────────────────────────────
