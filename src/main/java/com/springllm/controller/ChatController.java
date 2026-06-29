@@ -1,64 +1,28 @@
-package com.springllm.controller;
+﻿package com.springllm.controller;
 
 import com.springllm.dto.ChatRequest;
-import com.springllm.dto.ChatResponse;
+import com.springllm.service.ChatService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.ollama.api.OllamaChatOptions;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/chat")
 @RequiredArgsConstructor
 public class ChatController {
 
-    private final ChatClient chatClient;
+    private final ChatService chatService;
 
-    @PostMapping
-    public ResponseEntity<ChatResponse> chat(@RequestBody ChatRequest request) {
-        ChatClientRequestSpec spec = chatClient.prompt()
-                .user(request.message())
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, request.conversationId()));
-
-        if (request.model() != null && !request.model().isBlank()) {
-            spec = spec.options(
-                    OllamaChatOptions.builder()
-                            .model(request.model())
-            );
-        }
-
-        return ResponseEntity.ok(new ChatResponse(spec.call().content()));
-    }
-
-    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> stream(
-            @RequestParam String message,
-            @RequestParam(defaultValue = "default") String conversationId,
-            @RequestParam(required = false) String model) {
-
-        ChatClientRequestSpec spec = chatClient.prompt()
-                .user(message)
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId));
-
-        if (model != null && !model.isBlank()) {
-            spec = spec.options(OllamaChatOptions.builder().model(model));
-        }
-
-        return spec.stream().content()
-                .map(ChatController::toJsonString);
-    }
-
-    private static String toJsonString(String s) {
-        return "\"" + s.replace("\\", "\\\\")
-                       .replace("\"", "\\\"")
-                       .replace("\n", "\\n")
-                       .replace("\r", "\\r")
-                       .replace("\t", "\\t") + "\"";
+    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> stream(@RequestBody ChatRequest request, ServerHttpResponse response) {
+        log.info("stream.request conversationId={} model={}", request.conversationId(), request.model());
+        response.getHeaders().set("Cache-Control", "no-cache");
+        response.getHeaders().set("Connection", "keep-alive");
+        response.getHeaders().set("X-Accel-Buffering", "no");
+        return chatService.stream(request);
     }
 }
-
