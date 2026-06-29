@@ -5,13 +5,6 @@ spring:
   ai:
     ollama:
       base-url: http://localhost:11434   # 로컬 Ollama
-      chat:
-        model: gemma3:1b
-        think: false
-        temperature: 0.7
-        num-predict: 2048
-      embedding:
-        model: nomic-embed-text          # RAG용 (Phase 3~)
 
   # 로컬 개발: H2 인메모리
   datasource:
@@ -26,9 +19,9 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create-drop
-    show-sql: false
-    open-in-view: false
+      ddl-auto: create
+    show-sql: true
+    open-in-view: true
 
 server:
   port: 8080
@@ -40,7 +33,14 @@ management:
       exposure:
         include: "*"
 
-logging:
-  level:
-    org.springframework.ai: DEBUG        # AI 요청/응답 로그 확인
-    com.springllm: DEBUG
+chatbot:
+  client:
+    system-prompt: |
+      당신은 친절하고 유능한 AI 어시스턴트입니다.
+      한국어로 답변하며, 명확하고 간결하게 설명합니다.
+    model: gemma3:1b
+    think: false
+    temperature: 0.7
+    num-predict: 3200
+  memory:
+    max-messages: 20
