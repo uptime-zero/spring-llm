@@ -9,7 +9,6 @@ version = '0.0.1-SNAPSHOT'
 
 java {
     toolchain {
-        // Java 25 LTS — Spring Boot 4.1 공식 지원 버전
         languageVersion = JavaLanguageVersion.of(25)
     }
 }
@@ -36,17 +35,16 @@ dependencies {
 
     // Spring AI 2.0 — artifact ID 1.x와 다름 (아래 주의사항 참고)
     implementation 'org.springframework.ai:spring-ai-starter-model-ollama'
-    // RAG 사용 시 (Phase 3~):
-    // implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
 
     // 로컬 개발용 인메모리 DB
     runtimeOnly 'com.h2database:h2'
-    // PGVector 전환 시:
-    // runtimeOnly 'org.postgresql:postgresql'
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // 구조화 JSON 로깅 (Logstash/ELK 호환)
+    implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
 }
 
 // Java 25 미리보기 기능 활성화 (선택)
