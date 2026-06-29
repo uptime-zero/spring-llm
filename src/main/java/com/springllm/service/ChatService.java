@@ -25,7 +25,11 @@ public class ChatService {
     private final ChatbotProperties chatbotProperties;
 
     public Flux<String> stream(ChatRequest request) {
+        String effectiveModel = resolveModel(request.model());
+        String persona = resolvePersona(effectiveModel);
+
         ChatClientRequestSpec spec = chatClient.prompt()
+                .system(persona)
                 .user(request.message())
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, request.conversationId()));
 
@@ -50,5 +54,18 @@ public class ChatService {
                         log.info("stream.complete conversationId={}", request.conversationId()))
                 .doOnError(e ->
                         log.error("stream.error conversationId={}", request.conversationId(), e));
+    }
+
+    private String resolveModel(String requestModel) {
+        if (requestModel != null && !requestModel.isBlank()) return requestModel;
+        return chatbotProperties.client().model();
+    }
+
+    private String resolvePersona(String model) {
+        ChatbotProperties.PersonaProperties personas = chatbotProperties.personas();
+        if (personas.lite().models().contains(model)) {
+            return personas.lite().systemPrompt();
+        }
+        return personas.full().systemPrompt();
     }
 }
